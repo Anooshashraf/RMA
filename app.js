@@ -323,14 +323,8 @@
 // /* auto start */
 // init();
 
-/* app.js - Stacked drilldown with Days aggregation and neon performance bars
-   Requirements implemented:
-   - PapaParse CSV parsing
-   - Top KPIs: Total Labels Count, Total Devices Count, Total Cost
-   - Stacked drilldowns: Regions -> Market -> DM NAME -> Type
-   - Days column aggregated (distinct Days values per group)
-   - Performance bars with neon colors + animations
-   - Export PNG / PDF / CSV
+/* app.js - Hybrid: Regions->Market (step-by-step), from DM -> stacked
+   Uses PapaParse to fetch CSV, shows Days column, performance bars scale by level.
 */
 
 const sheetInput = document.getElementById('sheet-url');
@@ -343,44 +337,21 @@ const downloadPDFBtn = document.getElementById('downloadPDF');
 const downloadCSVBtn = document.getElementById('downloadCSV');
 const summaryContainer = document.getElementById('summary-cards');
 const stackedContainer = document.getElementById('stacked-container');
+const breadcrumbEl = document.getElementById('breadcrumb');
+const backBtn = document.getElementById('btn-back');
 
 let RAW_DATA = [];
+let historyStack = []; // track navigation state
 
-/* ---------------- utilities ---------------- */
-function parseCurrency(v){
-  if(v == null) return 0;
-  const s = String(v).replace(/[^0-9.\-]/g,'');
-  const n = parseFloat(s);
-  return isNaN(n) ? 0 : n;
-}
-function parseIntSafe(v){
-  if(v == null || v === '') return 0;
-  const n = parseInt(String(v).replace(/[^0-9\-]/g,''),10);
-  return isNaN(n) ? 0 : n;
-}
-function parseDateDMY(s){
-  if(!s) return null;
-  // supports DD/MM/YYYY or YYYY-MM-DD
-  if(/\d{2}\/\d{2}\/\d{4}/.test(s)){
-    const [dd,mm,yy] = s.split('/');
-    return new Date(Number(yy), Number(mm)-1, Number(dd));
-  }
-  const d = new Date(s);
-  return isNaN(d) ? null : d;
-}
+/* ---------------- Utility ---------------- */
+function parseCurrency(v){ if(v==null) return 0; const s=String(v).replace(/[^0-9.\-]/g,''); const n=parseFloat(s); return isNaN(n)?0:n; }
+function parseIntSafe(v){ if(v==null||v==='') return 0; const n=parseInt(String(v).replace(/[^0-9\-]/g,''),10); return isNaN(n)?0:n; }
+function parseDateDMY(s){ if(!s) return null; if(/\d{2}\/\d{2}\/\d{4}/.test(s)){ const [dd,mm,yy]=s.split('/'); return new Date(Number(yy), Number(mm)-1, Number(dd)); } const d=new Date(s); return isNaN(d)?null:d; }
 function formatCurrency(v){ return "$" + Number(v||0).toLocaleString(undefined,{maximumFractionDigits:2}); }
-function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, (m)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,(m)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function getField(obj, candidates){ for(const k of candidates){ if(k in obj && obj[k] !== "") return obj[k]; const matched = Object.keys(obj).find(x => x.toLowerCase() === k.toLowerCase()); if(matched && obj[matched] !== "") return obj[matched]; } return ""; }
 
-function getField(obj, candidates){
-  for(const k of candidates){
-    if(k in obj && obj[k] !== "") return obj[k];
-    const matched = Object.keys(obj).find(x => x.toLowerCase() === k.toLowerCase());
-    if(matched && obj[matched] !== "") return obj[matched];
-  }
-  return "";
-}
-
-/* ---------------- CSV fetch ---------------- */
+/* ---------------- Fetch CSV ---------------- */
 async function fetchCSV(url){
   try {
     const res = await fetch(url);
@@ -394,13 +365,13 @@ async function fetchCSV(url){
   }
 }
 
-/* ---------------- filters & KPIs ---------------- */
+/* ---------------- Filters & KPIs ---------------- */
 function applyFilters(data){
   const from = fromInput.value ? new Date(fromInput.value) : null;
   const to = toInput.value ? new Date(toInput.value) : null;
   if(!from && !to) return data;
   return data.filter(row=>{
-    const raw = getField(row, ['Processed Date','ProcessedDate','Processed_Date']);
+    const raw = getField(row,['Processed Date','ProcessedDate','Processed_Date']);
     const d = parseDateDMY(raw);
     if(!d) return false;
     if(from && d < from) return false;
@@ -412,51 +383,26 @@ function applyFilters(data){
   });
 }
 
-function animateNumber(el, end, duration=900){
-  const start = 0;
-  const range = end - start;
-  const startTime = performance.now();
-  function step(now){
-    const elapsed = now - startTime;
-    const t = Math.min(elapsed / duration, 1);
-    const value = Math.round(start + (range * easeOutCubic(t)));
-    el.textContent = value.toLocaleString();
-    if(t < 1) requestAnimationFrame(step);
-  }
-  requestAnimationFrame(step);
-}
-function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
-
 function buildSummaryCards(data){
   summaryContainer.innerHTML = '';
-  const totalLabels = data.length; // count of rows (labels)
+  const totalLabels = data.length;
   const totalDevices = data.reduce((s,r)=> s + parseIntSafe(getField(r,['Count of Devices','Count of device','Count'])), 0);
   const totalCost = data.reduce((s,r)=> s + parseCurrency(getField(r,['COST','Cost','cost'])), 0);
 
   const cards = [
-    {label:'Total Labels', value: totalLabels, sub:'All label rows'},
-    {label:'Total Devices', value: totalDevices, sub:'Sum of Count of Devices'},
-    {label:'Total Cost', value: totalCost, sub:'Sum of COST'}
+    {label:'Total Labels', value: totalLabels},
+    {label:'Total Devices', value: totalDevices},
+    {label:'Total Cost', value: formatCurrency(totalCost)}
   ];
 
   cards.forEach(c=>{
     const el = document.createElement('div'); el.className = 'kpi';
-    el.innerHTML = `<div class="label">${escapeHtml(c.label)}</div>
-                    <div class="value" data-val="${escapeHtml(String(c.value))}">0</div>
-                    <div class="sub">${escapeHtml(c.sub)}</div>`;
+    el.innerHTML = `<div class="label">${escapeHtml(c.label)}</div><div class="value">${escapeHtml(String(c.value))}</div>`;
     summaryContainer.appendChild(el);
-    // animate numeric
-    const valEl = el.querySelector('.value');
-    animateNumber(valEl, c.value, 900);
-    // show currency formatting for cost card
-    if(c.label === 'Total Cost'){
-      // after animation, replace numeric with formatted currency
-      setTimeout(()=>{ valEl.textContent = formatCurrency(c.value); }, 950);
-    }
   });
 }
 
-/* ---------------- aggregation ---------------- */
+/* ---------------- Aggregation ---------------- */
 function aggregate(data, keyField){
   const groups = {};
   data.forEach(row=>{
@@ -466,7 +412,7 @@ function aggregate(data, keyField){
     groups[key].count += 1;
     groups[key].devices += parseIntSafe(getField(row,['Count of Devices','Count of device','Count']));
     groups[key].cost += parseCurrency(getField(row,['COST','Cost','cost']));
-    const daysVal = getField(row, ['Days','DAY','day']);
+    const daysVal = getField(row,['Days','DAY','day']);
     if(daysVal) groups[key].daysSet.add(String(daysVal).trim());
     groups[key].rows.push(row);
   });
@@ -475,12 +421,11 @@ function aggregate(data, keyField){
     count: groups[k].count,
     devices: groups[k].devices,
     cost: groups[k].cost,
-    days: Array.from(groups[k].daysSet).sort(),
+    days: Array.from(groups[k].daysSet),
     rows: groups[k].rows
   })).sort((a,b)=> b.cost - a.cost);
 }
 
-/* ---------------- rendering levels ---------------- */
 function detectKey(candidates){
   if(!RAW_DATA || RAW_DATA.length===0) return candidates[0];
   for(const c of candidates){
@@ -489,15 +434,68 @@ function detectKey(candidates){
   return candidates[0];
 }
 
-function renderLevel(title, keyField, data, parentId){
-  if(!parentId) stackedContainer.innerHTML = '';
-  else {
-    const children = Array.from(stackedContainer.children);
-    const idx = children.findIndex(ch => ch.getAttribute('data-block-id') === parentId);
-    if(idx >= 0){
-      for(let i = children.length -1; i > idx; i--) stackedContainer.removeChild(children[i]);
+/* ---------------- Breadcrumb & history ---------------- */
+function pushHistory(item){
+  historyStack.push(item);
+  renderBreadcrumb();
+  backBtn.classList.toggle('hidden', historyStack.length <= 1);
+}
+function popHistory(){
+  historyStack.pop();
+  renderBreadcrumb();
+  backBtn.classList.toggle('hidden', historyStack.length <= 1);
+}
+function renderBreadcrumb(){
+  breadcrumbEl.innerHTML = historyStack.map((h,i)=>{
+    if(h.mode === 'step'){
+      return `<span>${escapeHtml(h.level)}${h.selected ? ' — ' + escapeHtml(h.selected) : ''}</span>`;
+    } else {
+      return `<span>${escapeHtml(h.level)}${h.selected ? ' — ' + escapeHtml(h.selected) : ''}</span>`;
     }
+  }).join(' › ');
+}
+backBtn.addEventListener('click', ()=>{
+  if(historyStack.length === 0) return;
+  const top = historyStack[historyStack.length -1];
+  if(top.mode === 'stack'){
+    // remove last stacked block from DOM
+    const block = document.querySelector(`[data-block-id="${top.blockId}"]`);
+    if(block) block.remove();
+    popHistory();
+  } else {
+    // top.mode === 'step' -> go back to previous step (pop current and render previous step)
+    historyStack.pop();
+    const prev = historyStack[historyStack.length -1];
+    if(!prev){
+      // nothing -> re-render Regions
+      refreshUI();
+      return;
+    }
+    // render the prev step level
+    if(prev.level === 'Regions'){
+      renderRegionsStep();
+    } else if(prev.level === 'Market' && prev.regionSelected){
+      renderMarketStep(prev.regionSelected);
+    } else {
+      // fallback: refresh UI
+      refreshUI();
+    }
+    renderBreadcrumb();
+    backBtn.classList.toggle('hidden', historyStack.length <= 1);
   }
+});
+
+/* ---------------- Render Helpers ---------------- */
+function createBlockHeader(title, meta){
+  const header = document.createElement('div'); header.className = 'table-header';
+  header.innerHTML = `<h2>${escapeHtml(title)}</h2><div class="meta">${escapeHtml(meta)}</div>`;
+  return header;
+}
+
+/* Step-mode renderer (clears container and renders single table) */
+function renderStepTable(title, keyField, data, levelName, onRowClick){
+  // clear entire container (step-by-step)
+  stackedContainer.innerHTML = '';
 
   const aggregated = aggregate(data, keyField);
   const maxCost = Math.max(...aggregated.map(a=>a.cost), 1);
@@ -506,12 +504,10 @@ function renderLevel(title, keyField, data, parentId){
   const blockId = 'blk-' + Math.random().toString(36).slice(2,9);
   block.setAttribute('data-block-id', blockId);
 
-  const header = document.createElement('div'); header.className = 'table-header';
-  header.innerHTML = `<h2>${escapeHtml(title)} (by ${escapeHtml(keyField)})</h2>
-                      <div class="meta">${aggregated.length} groups — total cost ${formatCurrency(aggregated.reduce((s,a)=>s+a.cost,0))}</div>`;
+  const header = createBlockHeader(title, `${aggregated.length} groups — total cost ${formatCurrency(aggregated.reduce((s,a)=>s+a.cost,0))}`);
   block.appendChild(header);
 
-  const table = document.createElement('table'); table.className = 'table';
+  const table = document.createElement('table'); table.className='table';
   const thead = document.createElement('thead');
   thead.innerHTML = `<tr>
     <th>${escapeHtml(keyField)}</th>
@@ -519,83 +515,171 @@ function renderLevel(title, keyField, data, parentId){
     <th class="col-right">Devices</th>
     <th class="col-right">Total Cost</th>
     <th>Days</th>
-    <th style="width:38%">Performance</th>
+    <th style="width:36%">Performance</th>
   </tr>`;
   table.appendChild(thead);
 
   const tbody = document.createElement('tbody');
   aggregated.forEach(g=>{
     const pct = Math.round((g.cost / maxCost) * 100);
-    const fillType = pct >= 70 ? 'green' : (pct >= 40 ? 'amber' : 'pink');
-    const daysHtml = g.days.length ? g.days.map(d => `<span class="days-pill">${escapeHtml(d)}</span>`).join(' ') : '<span class="days-pill">—</span>';
+    const fill = pct >= 70 ? 'green' : (pct >= 40 ? 'amber' : 'red');
+    const daysHtml = g.days.length ? g.days.map(d => `<span class="days-pill">${escapeHtml(d)}</span>`).join(' ') : '';
     const tr = document.createElement('tr');
     tr.innerHTML = `<td>${escapeHtml(g.key)}</td>
-                    <td class="col-right">${g.count}</td>
-                    <td class="col-right">${g.devices}</td>
-                    <td class="col-right">${formatCurrency(g.cost)}</td>
-                    <td>${daysHtml}</td>
-                    <td>
-                      <div class="bar-cell">
-                        <div class="bar-track"><div class="bar-fill ${fillType} glow" style="width:${pct}%;"></div></div>
-                        <div style="min-width:54px;text-align:right">${pct}%</div>
-                      </div>
-                    </td>`;
+      <td class="col-right">${g.count}</td>
+      <td class="col-right">${g.devices}</td>
+      <td class="col-right">${formatCurrency(g.cost)}</td>
+      <td>${daysHtml}</td>
+      <td>
+        <div class="bar-cell">
+          <div class="bar-track"><div class="bar-fill ${fill}" style="width:${pct}%;"></div></div>
+          <div style="min-width:52px;text-align:right">${pct}%</div>
+        </div>
+      </td>`;
     tr._group = g;
+    tr.addEventListener('click', ()=> onRowClick(g));
     tbody.appendChild(tr);
   });
-
   table.appendChild(tbody);
   block.appendChild(table);
   stackedContainer.appendChild(block);
 
-  // attach handlers
-  Array.from(tbody.querySelectorAll('tr')).forEach(tr=>{
-    tr.addEventListener('click', ()=>{
-      const grp = tr._group;
-      let nextKey = null;
-      if(['Regions','Region','REGIONS'].includes(keyField)) nextKey = 'Market';
-      else if(keyField === 'Market' || keyField === 'Market Name') nextKey = 'DM NAME';
-      else if(keyField === 'DM NAME' || keyField === 'DM Name') nextKey = 'Type';
-      else nextKey = null;
-
-      if(nextKey && !grp.rows.some(r => Object.keys(r).some(k => k.toLowerCase() === nextKey.toLowerCase()))){
-        if(nextKey === 'Market' && grp.rows.some(r => Object.keys(r).some(k => k.toLowerCase() === 'market name'))) nextKey = 'Market Name';
-        if(nextKey === 'DM NAME' && grp.rows.some(r => Object.keys(r).some(k => k.toLowerCase() === 'dm name'))) nextKey = 'DM Name';
-      }
-
-      if(!nextKey){
-        renderRawRows(grp.rows, blockId, grp.key);
-      } else {
-        renderLevel(nextKey, nextKey, grp.rows, blockId);
-      }
-
-      setTimeout(()=> {
-        const blocks = Array.from(stackedContainer.children);
-        const last = blocks[blocks.length -1];
-        if(last) last.scrollIntoView({behavior:'smooth', block:'start'});
-      }, 160);
-    });
-  });
-
-  return blockId;
+  return {blockId, block};
 }
 
-function renderRawRows(rows, parentId, label){
-  const children = Array.from(stackedContainer.children);
-  const idx = children.findIndex(ch => ch.getAttribute('data-block-id') === parentId);
-  if(idx >= 0){
-    for(let i = children.length -1; i > idx; i--) stackedContainer.removeChild(children[i]);
-  }
+/* Stacked renderer (appends block below existing ones) */
+function renderStackedTable(title, keyField, data, levelName, parentBlockId, onRowClick){
+  const aggregated = aggregate(data, keyField);
+  const maxCost = Math.max(...aggregated.map(a=>a.cost), 1);
 
   const block = document.createElement('div'); block.className = 'table-block';
   const blockId = 'blk-' + Math.random().toString(36).slice(2,9);
   block.setAttribute('data-block-id', blockId);
+  block.setAttribute('data-parent-id', parentBlockId || '');
 
-  const header = document.createElement('div'); header.className = 'table-header';
-  header.innerHTML = `<h2>Detailed rows — ${escapeHtml(label)}</h2><div class="meta">${rows.length} rows</div>`;
+  const header = createBlockHeader(title, `${aggregated.length} groups — total cost ${formatCurrency(aggregated.reduce((s,a)=>s+a.cost,0))}`);
   block.appendChild(header);
 
-  const table = document.createElement('table'); table.className = 'table';
+  const table = document.createElement('table'); table.className='table';
+  const thead = document.createElement('thead');
+  thead.innerHTML = `<tr>
+    <th>${escapeHtml(keyField)}</th>
+    <th class="col-right">Count</th>
+    <th class="col-right">Devices</th>
+    <th class="col-right">Total Cost</th>
+    <th>Days</th>
+    <th style="width:36%">Performance</th>
+  </tr>`;
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  aggregated.forEach(g=>{
+    const pct = Math.round((g.cost / maxCost) * 100);
+    const fill = pct >= 70 ? 'green' : (pct >= 40 ? 'amber' : 'red');
+    const daysHtml = g.days.length ? g.days.map(d => `<span class="days-pill">${escapeHtml(d)}</span>`).join(' ') : '';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${escapeHtml(g.key)}</td>
+      <td class="col-right">${g.count}</td>
+      <td class="col-right">${g.devices}</td>
+      <td class="col-right">${formatCurrency(g.cost)}</td>
+      <td>${daysHtml}</td>
+      <td>
+        <div class="bar-cell">
+          <div class="bar-track"><div class="bar-fill ${fill}" style="width:${pct}%;"></div></div>
+          <div style="min-width:52px;text-align:right">${pct}%</div>
+        </div>
+      </td>`;
+    tr._group = g;
+    tr.addEventListener('click', ()=> onRowClick(g, blockId));
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  block.appendChild(table);
+  stackedContainer.appendChild(block);
+
+  // add to history
+  pushHistory({mode:'stack', level:levelName, selected:null, blockId});
+  return blockId;
+}
+
+/* ---------------- Concrete flows ---------------- */
+
+/* Regions step (initial) */
+function renderRegionsStep(){
+  const regionKey = detectKey(['Regions','Region','REGIONS','regions']);
+  renderStepTable('Regions', regionKey, applyFilters(RAW_DATA), 'Regions', (group)=>{
+    // on region click -> step into Markets (replace content)
+    renderMarketStep(group.key);
+    pushHistory({mode:'step', level:'Market', selected: group.key});
+  });
+  // reset history: start with root Regions
+  historyStack = [{mode:'step', level:'Regions'}];
+  renderBreadcrumb();
+  backBtn.classList.toggle('hidden', historyStack.length <= 1);
+}
+
+/* Market step (clears, shows markets for selected region) */
+function renderMarketStep(regionName){
+  const regionKey = detectKey(['Regions','Region','REGIONS','regions']);
+  // filter rows for region
+  const rowsForRegion = applyFilters(RAW_DATA).filter(r => {
+    const reg = getField(r, ['Regions','Region']);
+    return String(reg || '').trim() === String(regionName).trim();
+  });
+  const marketKey = detectKey(['Market','Market Name','Market Name ','MARKET']);
+  renderStepTable('Markets', marketKey, rowsForRegion, 'Market', (group)=>{
+    // on market click -> stacked DM block appended
+    // push step state for Market selection
+    // ensure the current history includes this market selection
+    // replace top of history if last was Market step
+    const last = historyStack[historyStack.length-1];
+    if(last && last.mode === 'step' && last.level === 'Market') {
+      historyStack[historyStack.length-1].selected = group.key;
+    } else {
+      pushHistory({mode:'step', level:'Market', selected: group.key});
+    }
+    // append stacked DM table
+    renderDMStack(group.rows, group.key);
+  });
+}
+
+/* DM stacked (append below markets) */
+function renderDMStack(rowsForMarket, marketName){
+  const dmKey = detectKey(['DM NAME','DM Name','DM','Dm Name']);
+  // append a stacked DM table (parentBlockId is last step block in DOM)
+  // find last rendered step block (Markets) to set as parent
+  const lastStepBlock = Array.from(stackedContainer.children).slice(-1)[0] || null;
+  const parentId = lastStepBlock ? lastStepBlock.getAttribute('data-block-id') : null;
+
+  // append stacked DM table
+  const blockId = renderStackedTable('DMs (stacked)', dmKey, rowsForMarket, 'DM', parentId, (group, parentBlockId)=>{
+    // when DM row clicked -> append Type stacked under DM
+    renderTypeStack(group.rows, group.key, parentBlockId);
+  });
+
+  // select that DM state in history handled in renderStackedTable
+}
+
+/* Type stacked (append under DM) */
+function renderTypeStack(rowsForDM, dmName, parentBlockId){
+  const typeKey = detectKey(['Type','TYPE','type']);
+  renderStackedTable('Type (stacked)', typeKey, rowsForDM, 'Type', parentBlockId, (group, thisParentId)=>{
+    // leaf clicked -> show raw rows (detailed) appended
+    renderRawRowsStack(group.rows, group.key, thisParentId);
+  });
+}
+
+/* Render raw rows appended */
+function renderRawRowsStack(rows, label, parentBlockId){
+  const block = document.createElement('div'); block.className = 'table-block';
+  const blockId = 'blk-' + Math.random().toString(36).slice(2,9);
+  block.setAttribute('data-block-id', blockId);
+  block.setAttribute('data-parent-id', parentBlockId || '');
+
+  const header = createBlockHeader(`Detailed — ${label}`, `${rows.length} rows`);
+  block.appendChild(header);
+
+  const table = document.createElement('table'); table.className='table';
   const thead = document.createElement('thead');
   thead.innerHTML = `<tr><th>Processed Date</th><th>Market</th><th>DM NAME</th><th>Type</th><th class="col-right">Devices</th><th class="col-right">Cost</th><th>Days</th></tr>`;
   table.appendChild(thead);
@@ -614,47 +698,21 @@ function renderRawRows(rows, parentId, label){
     tr.innerHTML = `<td>${escapeHtml(pd)}</td><td>${escapeHtml(mk)}</td><td>${escapeHtml(dm)}</td><td>${escapeHtml(tp)}</td><td class="col-right">${devices}</td><td class="col-right">${cost}</td><td>${daysHtml}</td>`;
     tbody.appendChild(tr);
   });
-
   table.appendChild(tbody);
   block.appendChild(table);
   stackedContainer.appendChild(block);
-  return blockId;
+
+  pushHistory({mode:'stack', level:'raw', selected: label, blockId});
 }
 
-/* ---------------- exports ---------------- */
-function exportCSV(rows){
-  if(!rows || rows.length === 0){ alert('No rows to export'); return; }
-  const keys = Object.keys(rows[0]);
-  const csv = [keys.join(',')].concat(rows.map(r => keys.map(k => `"${String(r[k]||'').replace(/"/g,'""')}"`).join(','))).join('\n');
-  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = 'tradeins_export.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+/* ---------------- Refresh UI & init ---------------- */
+function refreshUI(){
+  const filtered = applyFilters(RAW_DATA);
+  buildSummaryCards(filtered);
+  // Start with Regions step
+  renderRegionsStep();
 }
 
-function downloadPNG(){
-  const el = document.getElementById('capture-area');
-  html2canvas(el, {scale:1.8, useCORS:true}).then(canvas=>{
-    const link = document.createElement('a');
-    link.href = canvas.toDataURL('image/png');
-    link.download = 'tradeins_dashboard.png';
-    link.click();
-  });
-}
-function downloadPDF(){
-  const el = document.getElementById('capture-area');
-  html2canvas(el, {scale:1.8, useCORS:true}).then(canvas=>{
-    const img = canvas.toDataURL('image/png');
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF('p','mm','a4');
-    const width = pdf.internal.pageSize.getWidth();
-    const imgWidth = width - 18;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    pdf.addImage(img,'PNG',9,10,imgWidth,imgHeight);
-    pdf.save('tradeins_dashboard.pdf');
-  });
-}
-
-/* ---------------- init ---------------- */
 async function init(){
   const url = sheetInput.value.trim();
   const data = await fetchCSV(url);
@@ -665,7 +723,7 @@ async function init(){
     RAW_DATA = data;
   }
 
-  // set date defaults
+  // set default dates if available
   const dateVals = RAW_DATA.map(r => parseDateDMY(getField(r,['Processed Date','ProcessedDate']))).filter(Boolean);
   if(dateVals.length){
     const minD = new Date(Math.min(...dateVals.map(d=>d.getTime())));
@@ -677,28 +735,34 @@ async function init(){
   refreshUI();
 
   applyBtn.addEventListener('click', refreshUI);
-  resetBtn.addEventListener('click', ()=>{
-    fromInput.value=''; toInput.value=''; refreshUI();
+  resetBtn.addEventListener('click', ()=>{ fromInput.value=''; toInput.value=''; refreshUI(); });
+  downloadPNGBtn.addEventListener('click', ()=> {
+    html2canvas(document.getElementById('capture-area'), {scale:1.6}).then(canvas=>{
+      const link = document.createElement('a'); link.href = canvas.toDataURL('image/png'); link.download = 'tradeins_dashboard.png'; link.click();
+    });
   });
-  downloadPNGBtn.addEventListener('click', downloadPNG);
-  downloadPDFBtn.addEventListener('click', downloadPDF);
-  downloadCSVBtn.addEventListener('click', ()=> exportCSV(applyFilters(RAW_DATA)));
+  downloadPDFBtn.addEventListener('click', ()=> {
+    html2canvas(document.getElementById('capture-area'), {scale:1.6}).then(canvas=>{
+      const img = canvas.toDataURL('image/png'); const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF('p','mm','a4'); const width = pdf.internal.pageSize.getWidth(); const imgWidth = width - 18;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width; pdf.addImage(img,'PNG',9,10,imgWidth,imgHeight); pdf.save('tradeins_dashboard.pdf');
+    });
+  });
+  downloadCSVBtn.addEventListener('click', ()=> {
+    const filtered = applyFilters(RAW_DATA);
+    if(!filtered.length){ alert('No rows to export'); return; }
+    const keys = Object.keys(filtered[0]);
+    const csv = [keys.join(',')].concat(filtered.map(r => keys.map(k => `"${String(r[k]||'').replace(/"/g,'""')}"`).join(','))).join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'}); const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'tradeins_export.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  });
 
   sheetInput.addEventListener('change', async ()=>{
     const newUrl = sheetInput.value.trim();
     const newData = await fetchCSV(newUrl);
-    if(newData && newData.length){ RAW_DATA = newData; refreshUI(); }
-    else alert('Could not fetch CSV from provided URL — check sharing settings or URL.');
+    if(newData && newData.length){ RAW_DATA = newData; refreshUI(); } else alert('Could not fetch CSV from provided URL — check sharing settings or URL.');
   });
 }
 
-function refreshUI(){
-  const filtered = applyFilters(RAW_DATA);
-  buildSummaryCards(filtered);
-  stackedContainer.innerHTML = '';
-
-  const regionKey = detectKey(['Regions','Region','REGIONS','regions']);
-  renderLevel('Region Summary', regionKey, filtered, null);
-}
-
+/* start */
 init();
