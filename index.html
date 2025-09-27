@@ -50,72 +50,81 @@
 </html>  -->
 
 
-
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Trade-ins — Futuristic Stacked Drilldown</title>
+  <title>Trade-ins — Regions → Markets → (DM stacked)</title>
 
-  <!-- Google Font -->
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Orbitron:wght@600&display=swap" rel="stylesheet">
 
-  <!-- Libraries -->
+  <!-- libs -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
-  <!-- Styles -->
-  <link rel="stylesheet" href="./style.css" />
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="app">
     <header class="topbar">
       <div class="brand">
         <div class="logo">⚡</div>
-        <div class="title">
-          <div class="main">Trade-ins Dashboard</div>
-          <div class="sub">Regions → Markets → DM → Type (stacked)</div>
+        <div>
+          <div class="title">Trade-ins Dashboard</div>
+          <div class="subtitle">Regions → Markets (step) — DM → Type (stacked)</div>
         </div>
       </div>
 
       <div class="controls">
-        <input id="sheet-url" type="text" class="input-url"
+        <input id="sheet-url" class="sheet-url"
           value="https://docs.google.com/spreadsheets/d/e/2PACX-1vS_xc8D53b3lTNKPM5cvwe2Fpdrr4N_zYYTAaScr0N7o2CHwSyWoW_PJxBMrjk5Fw/pub?gid=73302648&single=true&output=csv"
-          placeholder="Google Sheet CSV URL" />
-
-        <div class="date-range">
-          <input id="from-date" type="date" />
-          <input id="to-date" type="date" />
-        </div>
-
-        <button id="apply-filters" class="btn btn-primary">Apply</button>
+          />
+        <input id="from-date" type="date" />
+        <input id="to-date" type="date" />
+        <button id="apply-filters" class="btn primary">Apply</button>
         <button id="reset-filters" class="btn">Reset</button>
 
         <div class="exports">
           <button id="downloadPNG" class="btn">PNG</button>
           <button id="downloadPDF" class="btn">PDF</button>
-          <button id="downloadCSV" class="btn btn-success">Export CSV</button>
+          <button id="downloadCSV" class="btn success">CSV</button>
         </div>
       </div>
     </header>
 
-    <main id="capture-area" class="main-area">
-      <section class="kpi-row" id="summary-cards" aria-live="polite">
-        <!-- KPIs inserted here -->
+    <main class="content" id="capture-area">
+      <!-- KPI row -->
+      <section class="kpi-row" id="kpis">
+        <div class="kpi-card">
+          <div class="kpi-label">Total Labels</div>
+          <div class="kpi-value" id="kpi-labels">0</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Total Devices</div>
+          <div class="kpi-value" id="kpi-devices">0</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Total Cost</div>
+          <div class="kpi-value" id="kpi-cost">$0</div>
+        </div>
       </section>
 
-      <section id="stacked-container" class="stacked">
-        <!-- Stacked drilldown blocks appear here -->
-      </section>
+      <!-- Breadcrumb / Back area -->
+      <nav id="breadcrumb" class="breadcrumb" style="display:none"></nav>
 
-      <div class="note">Click any row to expand the next level. Performance bars visualize <strong>total cost</strong>. Days column lists distinct Days values present in that group.</div>
+      <!-- Primary view (Regions or Markets) -->
+      <section id="primary-view" class="block-area"></section>
+
+      <!-- Stacked view (DM and Type) — only used after Market level -->
+      <section id="stacked-view" class="stacked-area"></section>
+
+      <div class="note">Click a row to drill: Regions → Markets (step). From Markets click DM to open stacked DM → Type below.</div>
     </main>
   </div>
 
-  <!-- App script -->
-  <script src="./app.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
-
