@@ -1,0 +1,665 @@
+<!-- <!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Trade-ins Dashboard — Stacked Drilldown (Regions → Markets → DM → Type)</title>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+  :root{
+    --page-bg: linear-gradient(180deg,#eaf2ff 0%, #f8fbff 100%);
+    --card-bg: rgba(255,255,255,0.70);
+    --glass-shadow: 0 6px 22px rgba(16,24,40,0.08);
+    --accent: #2563eb;
+    --muted: #64748b;
+    --success: linear-gradient(90deg,#16a34a,#22c55e);
+    --mid: linear-gradient(90deg,#f59e0b,#facc15);
+    --low: linear-gradient(90deg,#ef4444,#dc2626);
+    --max-width: 1200px;
+    --radius: 12px;
+  }
+  *{box-sizing:border-box;font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif}
+  body{margin:0;padding:28px;background:var(--page-bg);color:#0f172a}
+  .wrap{max-width:var(--max-width);margin:0 auto}
+  h1{margin:0 0 18px;font-size:1.9rem;color:var(--accent);display:flex;align-items:center;gap:10px}
+  .controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:18px 0 22px}
+  .control-item{background:var(--card-bg);backdrop-filter: blur(6px);padding:10px 14px;border-radius:10px;box-shadow:var(--glass-shadow);display:flex;gap:8px;align-items:center}
+  select,input[type="date"]{border:1px solid rgba(16,24,40,0.06);padding:8px;border-radius:8px}
+  button.action{background:linear-gradient(135deg,var(--accent),#1e40af);color:#fff;border:none;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600;box-shadow:0 6px 18px rgba(37,99,235,0.18)}
+  button.action:active{transform:translateY(1px)}
+  .cards{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:18px}
+  .card{flex:1 1 220px;background:var(--card-bg);padding:16px;border-radius:12px;box-shadow:var(--glass-shadow);min-width:180px}
+  .card .label{font-size:0.92rem;color:var(--muted);margin-bottom:8px}
+  .card .value{font-size:1.25rem;font-weight:700;color:#0f172a}
+  .table-block{background:var(--card-bg);padding:14px;border-radius:12px;box-shadow:var(--glass-shadow);margin-bottom:18px}
+  .table-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;flex-wrap:wrap}
+  .table-header h2{margin:0;font-size:1.05rem;color:#0f172a}
+  .table{width:100%;border-collapse:collapse}
+  .table th,.table td{padding:10px 12px;text-align:left;font-size:0.95rem}
+  .table th{background:transparent;color:#0f172a;font-weight:700;border-bottom:1px dashed rgba(15,23,42,0.06)}
+  .table tbody tr{border-bottom:1px solid rgba(15,23,42,0.04);cursor:pointer;transition:background .12s}
+  .table tbody tr:hover{background:rgba(37,99,235,0.03)}
+  .col-numeric{text-align:right}
+  .bar-cell{display:flex;align-items:center;gap:8px}
+  .bar-track{height:12px;background:rgba(15,23,42,0.06);border-radius:8px;flex:1;overflow:hidden}
+  .bar-fill{height:100%;width:0;border-radius:8px}
+  .bar-fill.high{background:var(--success)}
+  .bar-fill.mid{background:var(--mid)}
+  .bar-fill.low{background:var(--low)}
+  .drillnote{font-size:0.86rem;color:var(--muted);margin-top:8px}
+  .hidden{display:none}
+  @media(min-width:1000px){
+    .card{padding:18px}
+    .table-block{padding:18px}
+  }
+  @media(max-width:560px){
+    .controls{flex-direction:column;align-items:stretch}
+    .cards{flex-direction:column}
+    .card{min-width:unset}
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>📦 Trade-ins — Regions → Markets → DM → Type</h1>
+
+    <div class="controls">
+      <div class="control-item">
+        <label for="sheet-url" style="font-size:0.9rem;color:var(--muted)">Google Sheet CSV URL</label>
+        <input id="sheet-url" type="text" style="min-width:420px"
+         value="https://docs.google.com/spreadsheets/d/e/2PACX-1vS_xc8D53b3lTNKPM5cvwe2Fpdrr4N_zYYTAaScr0N7o2CHwSyWoW_PJxBMrjk5Fw/pub?gid=73302648&single=true&output=csv"/>
+      </div>
+
+      <div class="control-item">
+        <label style="font-size:0.9rem;color:var(--muted)">Date range</label>
+        <input id="from-date" type="date" />
+        <input id="to-date" type="date" />
+      </div>
+
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button id="apply-filters" class="action">Apply</button>
+        <button id="reset-filters" class="action" style="background:linear-gradient(135deg,#6b7280,#475569)">Reset</button>
+      </div>
+
+      <div style="margin-left:auto;display:flex;gap:8px;">
+        <button id="downloadPNG" class="action">⬇️ PNG</button>
+        <button id="downloadPDF" class="action">⬇️ PDF</button>
+        <button id="downloadCSV" class="action" style="background:linear-gradient(135deg,#10b981,#059669)">⬇️ Export CSV</button>
+      </div>
+    </div>
+
+    <div id="summary-cards" class="cards" aria-live="polite"></div>
+    <div id="stacked-container"></div>
+    <div style="height:32px"></div>
+    <div style="font-size:0.85rem;color:var(--muted)">Built for stacked drilldowns — click any row to expand the next level. Performance bars show relative total cost at that level.</div>
+  </div>
+
+<script>
+  /* ================= Configuration ================= */
+const DEFAULT_CSV = document.getElementById('sheet-url').value.trim();
+const SAMPLE_DATA = [
+  {"Market":"BAY AREA","DISTRICT":0,"DM NAME":"Aous Ashour","Store ID":"TECH1006","Store Name":"1006 N DAVIS RD","Door Code":70850791,"Model Number":"MOT XT2417-1_UT","Description":"Moto G 5G Green 128Gb","Customer IMEI":351514491061193,"Employee Name NTID":"","Assurant IMEI":356645508039015,"Processed Date":"22/09/2025","Label Type":"#N/A","RMA #":"#N/A","RMA Date":"#N/A","Count of Devices":0,"Tracking Details":"#N/A","Shipping Status":"No shipping label","COST":"$70.95","AGE":2,"XBM Number":"XBM25092202Q","Type":"XBM","Days":"7 Days","Regions":"Hasnain Mustaqeem"},
+  {"Market":"EAST BAY AREA","DISTRICT":"RICHMOND","DM NAME":"Saad Ali","Store ID":"TECH1029","Store Name":"1029 ARNOLD","Door Code":70851666,"Model Number":610215000000,"Description":"MOT XT25131 G 5G 128G GRY KIT","Customer IMEI":352291421085597,"Employee Name NTID":"LOL11073","Assurant IMEI":359636864501950,"Processed Date":"26/09/2025","Label Type":"Cracked Box","RMA #":"RMA250926069","RMA Date":"26/09/2025","Count of Devices":1,"Tracking Details":"1Z1X298A0397296815","Shipping Status":"Pending to Ship","COST":"$144.00","AGE":1,"XBM Number":"","Type":"RMA","Days":"7 Days","Regions":"Hasnain Mustaqeem"},
+  {"Market":"HOUSTON","DISTRICT":"Central","DM NAME":"Zubair Hussain","Store ID":"TECH10307","Store Name":"10307 CULLEN","Door Code":70832580,"Model Number":610215000000,"Description":"MOT XT25131 G 5G 128G GRY KIT","Customer IMEI":352753801941624,"Employee Name NTID":"AWE65496","Assurant IMEI":"","Processed Date":"25/09/2025","Label Type":"Remorse Return","RMA #":"RMA25092503T","RMA Date":"25/09/2025","Count of Devices":1,"Tracking Details":"1Z1X298A0396340107","Shipping Status":"Pending to Ship","COST":"$144.00","AGE":2,"XBM Number":"","Type":"RMA","Days":"7 Days","Regions":"Aleem Region"},
+  {"Market":"OXNARD","DISTRICT":"Oxnard/Palmdale","DM NAME":"Aslam Khan","Store ID":"TECH107","Store Name":"107 S. ROSE AVE","Door Code":70851770,"Model Number":610215000000,"Description":"SAG FAST5688W 5G GATEWAY BLK TMUS CPO","Customer IMEI":350596537591466,"Employee Name NTID":"IQT17863","Assurant IMEI":"","Processed Date":"25/09/2025","Label Type":"Remorse Return","RMA #":"RMA2509250AA","RMA Date":"26/09/2025","Count of Devices":1,"Tracking Details":"1Z1X298A0399159540","Shipping Status":"Pending to Ship","COST":"$59.00","AGE":2,"XBM Number":"","Type":"RMA","Days":"7 Days","Regions":"Hasnain Mustaqeem"}
+];
+
+let RAW_DATA = []; // parsed dataset (array of objects)
+
+/* ================= Utility funcs ================= */
+function parseCurrency(v){
+  if(v==null) return 0;
+  const s = String(v).replace(/[^0-9.\-]/g,'');
+  const n = parseFloat(s);
+  return isNaN(n)?0:n;
+}
+function parseDateDMY(s){
+  if(!s) return null;
+  // Accept DD/MM/YYYY or YYYY-MM-DD
+  if(/\d{2}\/\d{2}\/\d{4}/.test(s)){
+    const parts = s.split('/');
+    return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+  } else {
+    const d = new Date(s);
+    if(!isNaN(d)) return d;
+    return null;
+  }
+}
+function formatCurrency(v){
+  return "$" + Number(v||0).toLocaleString(undefined, {maximumFractionDigits:2});
+}
+
+/* normalize keys to the names we expect without changing original object references */
+function getField(obj, prefer){
+  // prefer is array of possible keys
+  for(const k of prefer){
+    if(k in obj && obj[k] !== "") return obj[k];
+    // also try uppercase/lowercase variants
+    const up = Object.keys(obj).find(x => x.toLowerCase() === k.toLowerCase());
+    if(up && obj[up] !== "") return obj[up];
+  }
+  return "";
+}
+
+/* apply filters */
+function applyFilters(data){
+  const from = document.getElementById('from-date').value;
+  const to = document.getElementById('to-date').value;
+  if(!from && !to) return data;
+  const fromD = from ? new Date(from) : null;
+  const toD = to ? new Date(to) : null;
+  return data.filter(row=>{
+    const pdRaw = getField(row, ['Processed Date','ProcessedDate','Processed_Date']);
+    const d = parseDateDMY(pdRaw) || null;
+    if(!d) return false;
+    if(fromD && d < fromD) return false;
+    if(toD){
+      // include the whole to-day
+      const toEnd = new Date(toD.getFullYear(), toD.getMonth(), toD.getDate(), 23,59,59);
+      if(d > toEnd) return false;
+    }
+    return true;
+  });
+}
+
+/* compute top-level summary cards */
+function buildSummaryCards(data){
+  const container = document.getElementById('summary-cards');
+  const totalCount = data.length;
+  const totalCost = data.reduce((s,row)=> s + parseCurrency(getField(row,['COST','Cost','cost'])), 0);
+  container.innerHTML = '';
+  const cards = [
+    {label: 'Total Trade-ins (rows)', value: totalCount},
+    {label: 'Total Cost', value: formatCurrency(totalCost)},
+  ];
+  cards.forEach(c=>{
+    const el = document.createElement('div'); el.className = 'card';
+    el.innerHTML = `<div class="label">${c.label}</div><div class="value">${c.value}</div>`;
+    container.appendChild(el);
+  });
+}
+
+/* generic aggregator for a level */
+function aggregate(data, keyField){
+  const groups = {};
+  data.forEach(row=>{
+    const key = String(getField(row, [keyField, keyField.toUpperCase(), keyField.toLowerCase()]) || 'Unknown').trim() || 'Unknown';
+    if(!groups[key]) groups[key] = {count:0, cost:0, rows:[]};
+    groups[key].count += 1;
+    groups[key].cost += parseCurrency(getField(row,['COST','Cost','cost']));
+    groups[key].rows.push(row);
+  });
+  // convert to array sorted by cost desc
+  return Object.keys(groups).map(k => ({key:k, count: groups[k].count, cost: groups[k].cost, rows: groups[k].rows})).sort((a,b)=>b.cost - a.cost);
+}
+
+/* render a table block for a level and attach click handler to drill deeper */
+function renderLevel(title, keyField, data, parentId){
+  const container = document.getElementById('stacked-container');
+  // remove any lower-level blocks after parentId (if provided). If parentId is null -> clear all and start fresh.
+  if(!parentId){
+    container.innerHTML = '';
+  } else {
+    // remove everything after the element with data-block-id = parentId
+    const blocks = Array.from(container.querySelectorAll('.table-block'));
+    let keep = true;
+    blocks.forEach(b=>{
+      if(keep && b.getAttribute('data-block-id') === parentId){
+        keep = true;
+      } else if(!keep){
+        // already past parent - remove
+      }
+      // Actually we'll remove all blocks that come after the parent
+    });
+    // simpler: find index of parent element and remove all after it
+    const allBlocks = Array.from(container.children);
+    const idx = allBlocks.findIndex(ch => ch.getAttribute && ch.getAttribute('data-block-id') === parentId);
+    if(idx >= 0){
+      // remove everything after idx
+      for(let i = allBlocks.length -1; i > idx; i--){
+        container.removeChild(allBlocks[i]);
+      }
+    }
+  }
+
+  const aggregated = aggregate(data, keyField);
+  const maxCost = Math.max(...aggregated.map(a=>a.cost), 1);
+
+  const block = document.createElement('div');
+  block.className = 'table-block';
+  const blockId = 'blk-' + Math.random().toString(36).slice(2,9);
+  block.setAttribute('data-block-id', blockId);
+
+  // header
+  const header = document.createElement('div'); header.className = 'table-header';
+  header.innerHTML = `<h2>${title} (by ${keyField})</h2>
+  <div style="color:var(--muted);font-size:0.9rem">${aggregated.length} rows — total cost ${formatCurrency(aggregated.reduce((s,a)=>s+a.cost,0))}</div>`;
+  block.appendChild(header);
+
+  // table
+  const table = document.createElement('table'); table.className = 'table';
+  const thead = document.createElement('thead');
+  thead.innerHTML = `<tr>
+    <th>${keyField}</th>
+    <th class="col-numeric">Count</th>
+    <th class="col-numeric">Total Cost</th>
+    <th style="width:40%">Performance</th>
+  </tr>`;
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  aggregated.forEach(group=>{
+    const percent = Math.round((group.cost / maxCost) * 100);
+    let fillClass = 'low'; if(percent >= 70) fillClass='high'; else if(percent >= 40) fillClass='mid';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="key-cell">${escapeHtml(group.key)}</td>
+                    <td class="col-numeric">${group.count}</td>
+                    <td class="col-numeric">${formatCurrency(group.cost)}</td>
+                    <td>
+                      <div class="bar-cell">
+                        <div class="bar-track"><div class="bar-fill ${fillClass}" style="width:${percent}%;transition:width 600ms ease"></div></div>
+                        <div style="min-width:48px;text-align:right">${percent}%</div>
+                      </div>
+                    </td>`;
+    // click drills deeper. We'll attach handler below (so it captures group.rows)
+    tbody.appendChild(tr);
+
+    // store group rows on element for handler
+    tr._group = group;
+  });
+  table.appendChild(tbody);
+  block.appendChild(table);
+
+  // helpful note
+  const note = document.createElement('div'); note.className = 'drillnote';
+  note.textContent = 'Click any row to expand the next level.';
+  block.appendChild(note);
+
+  container.appendChild(block);
+
+  // attach click handlers to rows — decide next level based on current keyField
+  Array.from(tbody.querySelectorAll('tr')).forEach(tr=>{
+    tr.addEventListener('click', ()=>{
+      const grp = tr._group;
+      // determine next keyField in the hierarchy
+      const order = ['Regions','Region','Market','Market Name','DM NAME','DM Name','Type','Type ']; // we'll map dynamically
+      let nextKey = null;
+      if(['Regions','Region'].includes(keyField)) nextKey = 'Market';
+      else if(keyField === 'Market' || keyField === 'Market Name') nextKey = 'DM NAME';
+      else if(keyField === 'DM NAME' || keyField === 'DM Name') nextKey = 'Type';
+      else nextKey = null; // no deeper
+      if(!nextKey){
+        // optionally we could show store/model; for now show an expanded raw table
+        renderRawRows(grp.rows, blockId, grp.key);
+      } else {
+        renderLevel(nextKey, nextKey, grp.rows, blockId);
+      }
+      // smooth scroll to the newly created block
+      setTimeout(()=> {
+        const blocks = Array.from(document.querySelectorAll('.table-block'));
+        const last = blocks[blocks.length -1];
+        if(last) last.scrollIntoView({behavior:'smooth',block:'start'});
+      },150);
+    });
+  });
+
+  return blockId;
+}
+
+/* render raw rows table (leaf) */
+function renderRawRows(rows, parentId, label){
+  // remove everything after parentId
+  const container = document.getElementById('stacked-container');
+  const allBlocks = Array.from(container.children);
+  const idx = allBlocks.findIndex(ch => ch.getAttribute && ch.getAttribute('data-block-id') === parentId);
+  if(idx >= 0){
+    for(let i = allBlocks.length -1; i > idx; i--) container.removeChild(allBlocks[i]);
+  }
+
+  const block = document.createElement('div'); block.className = 'table-block';
+  const blockId = 'blk-' + Math.random().toString(36).slice(2,9);
+  block.setAttribute('data-block-id', blockId);
+
+  const header = document.createElement('div'); header.className='table-header';
+  header.innerHTML = `<h2>Detailed rows — ${escapeHtml(label)}</h2><div style="color:var(--muted);font-size:0.9rem">${rows.length} rows</div>`;
+  block.appendChild(header);
+
+  const table = document.createElement('table'); table.className='table';
+  const thead = document.createElement('thead');
+  thead.innerHTML = `<tr>
+    <th>Processed Date</th>
+    <th>Market</th>
+    <th>DM NAME</th>
+    <th>Type</th>
+    <th class="col-numeric">Cost</th>
+  </tr>`;
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  rows.forEach(r=>{
+    const pd = getField(r,['Processed Date','ProcessedDate']) || '';
+    const m = getField(r,['Market','Market Name','Market Name ']) || '';
+    const dm = getField(r,['DM NAME','DM Name']) || '';
+    const tp = getField(r,['Type','TYPE']) || '';
+    const cost = formatCurrency(parseCurrency(getField(r,['COST','Cost'])));
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${pd}</td><td>${escapeHtml(m)}</td><td>${escapeHtml(dm)}</td><td>${escapeHtml(tp)}</td><td class="col-numeric">${cost}</td>`;
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  block.appendChild(table);
+
+  container.appendChild(block);
+  return blockId;
+}
+
+/* escape simple html */
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+/* export current filtered rows as CSV */
+function exportCSV(rows){
+  if(!rows || rows.length===0){ alert('No rows to export'); return; }
+  const keys = Object.keys(rows[0]);
+  const csv = [keys.join(',')].concat(rows.map(r => keys.map(k => `"${String(r[k]||'').replace(/"/g,'""')}"`).join(','))).join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'tradeins_export.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
+/* download PNG/PDF (wrap entire wrap div) */
+function downloadPNG(){
+  const el = document.querySelector('.wrap');
+  html2canvas(el, {scale:1.8}).then(canvas=>{
+    const link = document.createElement('a'); link.href = canvas.toDataURL('image/png'); link.download = 'tradeins_dashboard.png'; link.click();
+  });
+}
+function downloadPDF(){
+  const el = document.querySelector('.wrap');
+  html2canvas(el, {scale:1.8}).then(canvas=>{
+    const img = canvas.toDataURL('image/png');
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p','mm','a4');
+    const width = pdf.internal.pageSize.getWidth();
+    const imgWidth = width - 18;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    pdf.addImage(img,'PNG',9,10,imgWidth,imgHeight);
+    pdf.save('tradeins_dashboard.pdf');
+  });
+}
+
+/* ================= Data loading ================= */
+async function fetchCSV(url){
+  try{
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('fetch error ' + res.status);
+    const txt = await res.text();
+    return csvToJson(txt);
+  }catch(err){
+    console.warn('Fetching CSV failed:', err);
+    return null;
+  }
+}
+function csvToJson(csv){
+  const lines = csv.split(/\r?\n/).filter(l=>l.trim());
+  if(lines.length < 2) return [];
+  // parse header row with simple CSV split (works for common cases)
+  const headers = parseCSVRow(lines[0]);
+  const rows = [];
+  for(let i=1;i<lines.length;i++){
+    const rowArr = parseCSVRow(lines[i]);
+    if(rowArr.length === 0) continue;
+    const obj = {};
+    for(let j=0;j<headers.length;j++){
+      obj[headers[j].trim()] = rowArr[j] !== undefined ? rowArr[j].trim() : '';
+    }
+    rows.push(obj);
+  }
+  return rows;
+}
+function parseCSVRow(line){
+  // simple CSV parser supporting quoted values
+  const res = [];
+  let cur = '', inQuotes = false;
+  for(let i=0;i<line.length;i++){
+    const ch = line[i];
+    if(ch === '"' && line[i+1] === '"'){
+      cur += '"'; i++; continue;
+    } else if(ch === '"'){ inQuotes = !inQuotes; continue; }
+    if(ch === ',' && !inQuotes){ res.push(cur); cur=''; continue; }
+    cur += ch;
+  }
+  res.push(cur);
+  return res.map(s=>s.trim());
+}
+
+/* full init render with live fetch */
+async function initDashboard(){
+  const urlInput = document.getElementById('sheet-url');
+  const useUrl = urlInput.value.trim() || DEFAULT_CSV;
+  let data = await fetchCSV(useUrl);
+  if(!data || data.length === 0){
+    // fallback to sample
+    console.warn('Falling back to embedded sample data.');
+    data = SAMPLE_DATA.map(x => JSON.parse(JSON.stringify(x)));
+  }
+  RAW_DATA = data;
+
+  // set default dates based on processed dates present
+  const dateValues = RAW_DATA.map(r => parseDateDMY(getField(r,['Processed Date','ProcessedDate'])))
+                             .filter(d => d instanceof Date && !isNaN(d));
+  if(dateValues.length){
+    const minD = new Date(Math.min(...dateValues.map(d=>d.getTime())));
+    const maxD = new Date(Math.max(...dateValues.map(d=>d.getTime())));
+    // set inputs only if not already set
+    if(!document.getElementById('from-date').value){
+      document.getElementById('from-date').value = minD.toISOString().slice(0,10);
+    }
+    if(!document.getElementById('to-date').value){
+      document.getElementById('to-date').value = maxD.toISOString().slice(0,10);
+    }
+  }
+
+  // initial render (apply filters)
+  refreshUI();
+
+  // hook up buttons
+  document.getElementById('apply-filters').addEventListener('click', ()=> refreshUI());
+  document.getElementById('reset-filters').addEventListener('click', ()=>{
+    document.getElementById('from-date').value = '';
+    document.getElementById('to-date').value = '';
+    refreshUI();
+  });
+  document.getElementById('downloadPNG').addEventListener('click', downloadPNG);
+  document.getElementById('downloadPDF').addEventListener('click', downloadPDF);
+  document.getElementById('downloadCSV').addEventListener('click', ()=> {
+    const filtered = applyFilters(RAW_DATA);
+    exportCSV(filtered);
+  });
+
+  // allow changing sheet URL and reloading
+  urlInput.addEventListener('change', async ()=>{
+    const newUrl = urlInput.value.trim();
+    const newData = await fetchCSV(newUrl);
+    if(newData && newData.length){ RAW_DATA = newData; refreshUI(); }
+    else alert('Could not fetch CSV from provided URL — check sharing settings or URL.');
+  });
+}
+
+/* refresh UI using RAW_DATA and filters */
+function refreshUI(){
+  const filtered = applyFilters(RAW_DATA);
+  buildSummaryCards(filtered);
+  // clear stacked container
+  document.getElementById('stacked-container').innerHTML = '';
+  // render first level: Regions (key might be "Regions" or "Region" in your sheet)
+  // find actual key from sample
+  const regionKey = detectKey(['Regions','Region','REGIONS','regions']);
+  renderLevel('Region Summary', regionKey, filtered, null);
+}
+
+/* detect first present key from list */
+function detectKey(candidates){
+  if(!RAW_DATA || RAW_DATA.length===0) return candidates[0];
+  for(const c of candidates){
+    if(RAW_DATA.some(r => Object.keys(r).some(k => k.toLowerCase() === c.toLowerCase()))) return c;
+  }
+  // fallback: try 'Regions' literally
+  return candidates[0];
+}
+
+/* start */
+initDashboard();
+</script>
+</body>
+</html>  -->
+
+
+
+
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Trade-ins Dashboard — Stacked Drilldown (Regions → Markets → DM → Type)</title>
+
+<!-- libs -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+<style>
+  :root{
+    --page-bg: linear-gradient(180deg,#eaf2ff 0%, #f8fbff 100%);
+    --card-bg: rgba(255,255,255,0.70);
+    --glass-shadow: 0 6px 22px rgba(16,24,40,0.08);
+    --accent: #2563eb;
+    --muted: #64748b;
+    --success: linear-gradient(90deg,#16a34a,#22c55e);
+    --mid: linear-gradient(90deg,#f59e0b,#facc15);
+    --low: linear-gradient(90deg,#ef4444,#dc2626);
+    --max-width: 1200px;
+    --radius: 12px;
+  }
+  *{box-sizing:border-box;font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif}
+  body{margin:0;padding:28px;background:var(--page-bg);color:#0f172a}
+  .wrap{max-width:var(--max-width);margin:0 auto}
+  h1{margin:0 0 18px;font-size:1.9rem;color:var(--accent);display:flex;align-items:center;gap:10px}
+  .controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:18px 0 22px}
+  .control-item{background:var(--card-bg);backdrop-filter: blur(6px);padding:10px 14px;border-radius:10px;box-shadow:var(--glass-shadow);display:flex;gap:8px;align-items:center}
+  select,input[type="date"],input[type="text"]{border:1px solid rgba(16,24,40,0.06);padding:8px;border-radius:8px}
+  button.action{background:linear-gradient(135deg,var(--accent),#1e40af);color:#fff;border:none;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600;box-shadow:0 6px 18px rgba(37,99,235,0.18)}
+  button.action:active{transform:translateY(1px)}
+  .cards{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:18px}
+  .card{flex:1 1 220px;background:var(--card-bg);padding:16px;border-radius:12px;box-shadow:var(--glass-shadow);min-width:180px}
+  .card .label{font-size:0.92rem;color:var(--muted);margin-bottom:8px}
+  .card .value{font-size:1.25rem;font-weight:700;color:#0f172a}
+  .table-block{background:var(--card-bg);padding:14px;border-radius:12px;box-shadow:var(--glass-shadow);margin-bottom:18px}
+  .table-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;flex-wrap:wrap}
+  .table-header h2{margin:0;font-size:1.05rem;color:#0f172a}
+  .table{width:100%;border-collapse:collapse}
+  .table th,.table td{padding:10px 12px;text-align:left;font-size:0.95rem}
+  .table th{background:transparent;color:#0f172a;font-weight:700;border-bottom:1px dashed rgba(15,23,42,0.06)}
+  .table tbody tr{border-bottom:1px solid rgba(15,23,42,0.04);cursor:pointer;transition:background .12s}
+  .table tbody tr:hover{background:rgba(37,99,235,0.03)}
+  .col-numeric{text-align:right}
+  .bar-cell{display:flex;align-items:center;gap:8px}
+  .bar-track{height:12px;background:rgba(15,23,42,0.06);border-radius:8px;flex:1;overflow:hidden}
+  .bar-fill{height:100%;width:0;border-radius:8px}
+  .bar-fill.high{background:var(--success)}
+  .bar-fill.mid{background:var(--mid)}
+  .bar-fill.low{background:var(--low)}
+  .drillnote{font-size:0.86rem;color:var(--muted);margin-top:8px}
+  .hidden{display:none}
+  @media(min-width:1000px){
+    .card{padding:18px}
+    .table-block{padding:18px}
+  }
+  @media(max-width:560px){
+    .controls{flex-direction:column;align-items:stretch}
+    .cards{flex-direction:column}
+    .card{min-width:unset}
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>📦 Trade-ins — Regions → Markets → DM → Type</h1>
+
+    <div class="controls">
+      <div class="control-item">
+        <label for="sheet-url" style="font-size:0.9rem;color:var(--muted)">Google Sheet CSV URL</label>
+        <input id="sheet-url" type="text" style="min-width:420px"
+         value="https://docs.google.com/spreadsheets/d/e/2PACX-1vS_xc8D53b3lTNKPM5cvwe2Fpdrr4N_zYYTAaScr0N7o2CHwSyWoW_PJxBMrjk5Fw/pub?gid=73302648&single=true&output=csv"/>
+      </div>
+
+      <div class="control-item">
+        <label style="font-size:0.9rem;color:var(--muted)">Date range</label>
+        <input id="from-date" type="date" />
+        <input id="to-date" type="date" />
+      </div>
+
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button id="apply-filters" class="action">Apply</button>
+        <button id="reset-filters" class="action" style="background:linear-gradient(135deg,#6b7280,#475569)">Reset</button>
+      </div>
+
+      <div style="margin-left:auto;display:flex;gap:8px;">
+        <button id="downloadPNG" class="action">⬇️ PNG</button>
+        <button id="downloadPDF" class="action">⬇️ PDF</button>
+        <button id="downloadCSV" class="action" style="background:linear-gradient(135deg,#10b981,#059669)">⬇️ Export CSV</button>
+      </div>
+    </div>
+
+    <div id="summary-cards" class="cards" aria-live="polite"></div>
+    <div id="stacked-container"></div>
+    <div style="height:32px"></div>
+    <div style="font-size:0.85rem;color:var(--muted)">Built for stacked drilldowns — click any row to expand the next level. Performance bars show relative total cost at that level.</div>
+  </div>
+
+<script>
+async function fetchCSV(url){
+  try {
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('fetch error ' + res.status);
+    const txt = await res.text();
+    // robust parse with PapaParse
+    const parsed = Papa.parse(txt, {header:true, skipEmptyLines:true});
+    return parsed.data;
+  } catch(err){
+    console.warn('Fetching CSV failed:', err);
+    return null;
+  }
+}
+
+// placeholder for rendering
+function renderDashboard(data){
+  document.getElementById("summary-cards").innerHTML =
+    `<div class="card"><div class="label">Rows Loaded</div><div class="value">${data.length}</div></div>`;
+  document.getElementById("stacked-container").innerHTML =
+    `<div class="table-block"><div class="table-header"><h2>First 5 rows</h2></div>
+      <table class="table"><thead><tr>${Object.keys(data[0]).map(h=>`<th>${h}</th>`).join("")}</tr></thead>
+      <tbody>${data.slice(0,5).map(r=>`<tr>${Object.values(r).map(v=>`<td>${v}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+}
+
+// load on start
+(async function(){
+  const url = document.getElementById("sheet-url").value;
+  const data = await fetchCSV(url);
+  if(data && data.length>0){
+    renderDashboard(data);
+  } else {
+    document.getElementById("stacked-container").innerHTML = "<p style='color:red'>No data loaded. Please check CSV link.</p>";
+  }
+})();
+</script>
+</body>
+</html>
+
