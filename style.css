@@ -237,5 +237,23 @@ input[type="date"]{
   .btn{padding:8px 14px;font-size:0.85rem}
   .input-url{font-size:0.85rem}
 }
+/* Responsive table wrapper */
+@media (max-width:768px) {
+  .table-block {
+    padding: 16px; /* reduce padding slightly on small screens */
+  }
+  .table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch; /* smooth scrolling on iOS */
+  }
+  .table {
+    width: 100%;
+    min-width: 600px; /* ensures columns don't collapse too much */
+  }
+  .table th, .table td {
+    padding: 10px 12px;
+  }
+}
+
 
 .hidden{display:none}
