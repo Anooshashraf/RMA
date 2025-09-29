@@ -1143,7 +1143,7 @@ function renderDMStack(rowsForMarket, marketName, parentBlockId){
     const lastStepBlock = Array.from(stackedContainer.children).slice(-1)[0] || null;
     const parentId = lastStepBlock ? lastStepBlock.getAttribute('data-block-id') : null;
     
-    if (blockExists(parentId, 'DMs')) return;
+    if (blockExists(parentBlockId, 'DMs')) return;
     const blockId = renderStackedTable('DMs', dmKey, rowsForMarket, 'DM', parentId, (group, parentBlockId)=>{
         
         renderTypeStack(group.rows, group.key, parentBlockId);
