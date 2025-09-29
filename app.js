@@ -1137,7 +1137,8 @@ function renderMarketStep(regionName){
 }
 
 
-function renderDMStack(rowsForMarket, marketName){
+function renderDMStack(rowsForMarket, marketName, parentBlockId){
+   if (blockExists(parentBlockId, 'DM NAME')) return;
     const dmKey = detectKey(['DM NAME','DM Name','DM','Dm Name']);
     const lastStepBlock = Array.from(stackedContainer.children).slice(-1)[0] || null;
     const parentId = lastStepBlock ? lastStepBlock.getAttribute('data-block-id') : null;
