@@ -1138,13 +1138,13 @@ function renderMarketStep(regionName){
 
 
 function renderDMStack(rowsForMarket, marketName, parentBlockId){
-   if (blockExists(parentBlockId, 'DM NAME')) return;
+   
     const dmKey = detectKey(['DM NAME','DM Name','DM','Dm Name']);
     const lastStepBlock = Array.from(stackedContainer.children).slice(-1)[0] || null;
     const parentId = lastStepBlock ? lastStepBlock.getAttribute('data-block-id') : null;
     
     if (blockExists(parentId, 'DMs')) return;
-    const blockId = renderStackedTable('DMs (stacked)', dmKey, rowsForMarket, 'DM', parentId, (group, parentBlockId)=>{
+    const blockId = renderStackedTable('DMs', dmKey, rowsForMarket, 'DM', parentId, (group, parentBlockId)=>{
         
         renderTypeStack(group.rows, group.key, parentBlockId);
     });
@@ -1155,7 +1155,7 @@ function renderDMStack(rowsForMarket, marketName, parentBlockId){
 function renderTypeStack(rowsForDM, dmName, parentBlockId){
    if (blockExists(parentBlockId, 'Type')) return;
     const typeKey = detectKey(['Type','TYPE','type']);
-    renderStackedTable('Type (stacked)', typeKey, rowsForDM, 'Type', parentBlockId, (group, thisParentId)=>{
+    renderStackedTable('Type', typeKey, rowsForDM, 'Type', parentBlockId, (group, thisParentId)=>{
         
         renderRawRowsStack(group.rows, group.key, thisParentId);
     });
