@@ -464,27 +464,27 @@ async function init(){
         refreshUI();
     });
     
-    downloadPNGBtn.addEventListener('click', ()=> {
-        html2canvas(document.getElementById('capture-area'), {scale:1.6}).then(canvas=>{
-            const link = document.createElement('a');
-            link.href = canvas.toDataURL('image/png');
-            link.download = 'tradeins_dashboard.png';
-            link.click();
-        });
-    });
+    // downloadPNGBtn.addEventListener('click', ()=> {
+    //     html2canvas(document.getElementById('capture-area'), {scale:1.6}).then(canvas=>{
+    //         const link = document.createElement('a');
+    //         link.href = canvas.toDataURL('image/png');
+    //         link.download = 'tradeins_dashboard.png';
+    //         link.click();
+    //     });
+    // });
     
-    downloadPDFBtn.addEventListener('click', ()=> {
-        html2canvas(document.getElementById('capture-area'), {scale:1.6}).then(canvas=>{
-            const img = canvas.toDataURL('image/png');
-            const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF('p','mm','a4');
-            const width = pdf.internal.pageSize.getWidth();
-            const imgWidth = width - 18;
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
-            pdf.addImage(img,'PNG',9,10,imgWidth,imgHeight);
-            pdf.save('tradeins_dashboard.pdf');
-        });
-    });
+    // downloadPDFBtn.addEventListener('click', ()=> {
+    //     html2canvas(document.getElementById('capture-area'), {scale:1.6}).then(canvas=>{
+    //         const img = canvas.toDataURL('image/png');
+    //         const { jsPDF } = window.jspdf;
+    //         const pdf = new jsPDF('p','mm','a4');
+    //         const width = pdf.internal.pageSize.getWidth();
+    //         const imgWidth = width - 18;
+    //         const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    //         pdf.addImage(img,'PNG',9,10,imgWidth,imgHeight);
+    //         pdf.save('tradeins_dashboard.pdf');
+    //     });
+    // });
     
     downloadCSVBtn.addEventListener('click', ()=> {
         const filtered = applyFilters(RAW_DATA);
