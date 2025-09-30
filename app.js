@@ -404,7 +404,7 @@ function renderRawRowsStack(rows, label, parentBlockId){
     const table = document.createElement('table');
     table.className='table';
     const thead = document.createElement('thead');
-    thead.innerHTML = `<tr><th>Processed Date</th><th>Market</th><th>DM NAME</th><th>Type</th><th class="col-right">Devices</th><th class="col-right">Cost</th><th>Days</th></tr><th>Shipping Status</th>`;
+    thead.innerHTML = `<tr><th>Processed Date</th><th>Market</th><th>DM NAME</th><th>Type</th><th class="col-right">Devices</th><th class="col-right">Cost</th><th>Days</th></tr><th>Shipping Status</th></tr>`;
     table.appendChild(thead);
     
     const tbody = document.createElement('tbody');
