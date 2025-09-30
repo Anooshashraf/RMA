@@ -403,9 +403,19 @@ function renderRawRowsStack(rows, label, parentBlockId){
     
     const table = document.createElement('table');
     table.className='table';
-    const thead = document.createElement('thead');
-    thead.innerHTML = `<tr><th>Processed Date</th><th>Market</th><th>DM NAME</th><th>Type</th><th class="col-right">Devices</th><th class="col-right">Cost</th><th>Days</th></tr><th>Shipping Status</th></tr>`;
-    table.appendChild(thead);
+     const thead = document.createElement('thead');
+   thead.innerHTML = `
+     <tr>
+       <th>Processed Date</th>
+       <th>Market</th>
+       <th>DM NAME</th>
+       <th>Type</th>
+       <th class="col-right">Devices</th>
+       <th class="col-right">Cost</th>
+       <th>Days</th>
+       <th>Shipping Status</th>
+     </tr>`;
+   table.appendChild(thead);
     
     const tbody = document.createElement('tbody');
     rows.forEach(r=>{
@@ -420,7 +430,7 @@ function renderRawRowsStack(rows, label, parentBlockId){
          const shipping = getField(r, ['Shipping Status', 'SHIP_STATUS', 'Shipping', 'shipping']) || '';
         
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${escapeHtml(pd)}</td><td>${escapeHtml(mk)}</td><td>${escapeHtml(dm)}</td><td>${escapeHtml(tp)}</td><td class="col-right">${devices}</td><td class="col-right">${cost}</td><td>${daysHtml}</td><td>${shipping}</td>`;
+        tr.innerHTML = `<td>${escapeHtml(pd)}</td><td>${escapeHtml(mk)}</td><td>${escapeHtml(dm)}</td><td>${escapeHtml(tp)}</td><td class="col-right">${devices}</td><td class="col-right">${cost}</td><td>${daysHtml}</td><td>${escapeHtml(shipping)}</td>`;
         tbody.appendChild(tr);
     });
     table.appendChild(tbody);
