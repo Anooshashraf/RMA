@@ -427,10 +427,10 @@ function renderRawRowsStack(rows, label, parentBlockId){
         const cost = formatCurrency(parseCurrency(getField(r,['COST','Cost'])));
         const daysVal = getField(r,['Days','DAY','day']) || '';
         const daysHtml = daysVal ? `<span class="days-pill">${escapeHtml(daysVal)}</span>` : '';
-         const Assurant = getField(r, ['Assurant Status', 'Assurant_STATUS', 'assurant', 'Assurant']) || '';
+        const assurant = getField(r, ['Assurant Status', 'Assurant_STATUS', 'Assurant', 'assurant']) || '';
         
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${escapeHtml(pd)}</td><td>${escapeHtml(mk)}</td><td>${escapeHtml(dm)}</td><td>${escapeHtml(tp)}</td><td class="col-right">${devices}</td><td class="col-right">${cost}</td><td>${daysHtml}</td><td>${escapeHtml(Assurant)}</td>`;
+        tr.innerHTML = `<td>${escapeHtml(pd)}</td><td>${escapeHtml(mk)}</td><td>${escapeHtml(dm)}</td><td>${escapeHtml(tp)}</td><td class="col-right">${devices}</td><td class="col-right">${cost}</td><td>${daysHtml}</td><td>${escapeHtml(assurant)}</td>`;
         tbody.appendChild(tr);
     });
     table.appendChild(tbody);
