@@ -413,7 +413,7 @@ function renderRawRowsStack(rows, label, parentBlockId){
        <th class="col-right">Devices</th>
        <th class="col-right">Cost</th>
        <th>Days</th>
-       <th>Shipping Status</th>
+       <th>Assurant Status</th>
      </tr>`;
    table.appendChild(thead);
     
@@ -427,10 +427,10 @@ function renderRawRowsStack(rows, label, parentBlockId){
         const cost = formatCurrency(parseCurrency(getField(r,['COST','Cost'])));
         const daysVal = getField(r,['Days','DAY','day']) || '';
         const daysHtml = daysVal ? `<span class="days-pill">${escapeHtml(daysVal)}</span>` : '';
-         const shipping = getField(r, ['Shipping Status', 'SHIP_STATUS', 'Shipping', 'shipping']) || '';
+         const Assurant = getField(r, ['Assurant Status', 'Assurant_STATUS', 'assurant', 'Assurant']) || '';
         
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${escapeHtml(pd)}</td><td>${escapeHtml(mk)}</td><td>${escapeHtml(dm)}</td><td>${escapeHtml(tp)}</td><td class="col-right">${devices}</td><td class="col-right">${cost}</td><td>${daysHtml}</td><td>${escapeHtml(shipping)}</td>`;
+        tr.innerHTML = `<td>${escapeHtml(pd)}</td><td>${escapeHtml(mk)}</td><td>${escapeHtml(dm)}</td><td>${escapeHtml(tp)}</td><td class="col-right">${devices}</td><td class="col-right">${cost}</td><td>${daysHtml}</td><td>${escapeHtml(Assurant)}</td>`;
         tbody.appendChild(tr);
     });
     table.appendChild(tbody);
